@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <title>Private Access</title>
+    <style>
+        :root {
+            --bg-deep: #050510;
+            --bg-mid: #0a0a1a;
+            --glass-bg: rgba(12, 12, 30, 0.55);
+            --glass-border: rgba(140, 160, 220, 0.18);
+            --glass-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+            --text-primary: #e8e4f0;
+            --text-secondary: #a8a0c0;
+            --accent-blue: #7a8cc0;
+            --accent-purple: #9a7ac0;
+            --accent-cold: #c0b8e0;
+            --error-glow: rgba(180, 60, 80, 0.4);
+            --error-border: rgba(200, 70, 90, 0.5);
+            --moon-glow: rgba(190, 200, 230, 0.08);
+            --transition-speed: 1.4s;
+            --font-main: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            --font-display: 'Georgia', 'Times New Roman', serif;
+        }
+
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: var(--font-main);
+            background: var(--bg-deep);
+            -webkit-tap-highlight-color: transparent;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            user-select: none;
+        }
+
+        /* ═══════════════════════════════════════
+           FULL-SCREEN CANVAS LAYERS
+           ═══════════════════════════════════════ */
+        #starfield-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        #particle-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        #nebula-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+            background:
+                radial-gradient(ellipse 60% 45% at 20% 70%, rgba(40, 30, 80, 0.35) 0%, transparent 65%),
+                radial-gradient(ellipse 50% 40% at 80% 25%, rgba(30, 20, 70, 0.3) 0%, transparent 60%),
+                radial-gradient(ellipse 40% 35% at 50% 50%, rgba(25, 20, 60, 0.2) 0%, transparent 55%),
+                radial-gradient(ellipse 70% 55% at 60% 85%, rgba(35, 25, 75, 0.25) 0%, transparent 60%);
+            animation: nebula-breathe 12s ease-in-out infinite alternate;
+        }
+
+        @keyframes nebula-breathe {
+            0% {
+                opacity: 0.7;
+                transform: scale(1);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1.04);
+            }
+        }
+
+        #fog-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 3;
+            pointer-events: none;
+            background:
+                radial-gradient(ellipse 35% 25% at 30% 80%, rgba(100, 110, 150, 0.04) 0%, transparent 70%),
+                radial-gradient(ellipse 30% 22% at 70% 20%, rgba(110, 100, 160, 0.035) 0%, transparent 65%),
+                radial-gradient(ellipse 45% 30% at 55% 60%, rgba(90, 95, 140, 0.03) 0%, transparent 75%);
+            animation: fog-drift 18s ease-in-out infinite alternate;
+        }
+
+        @keyframes fog-drift {
+            0% {
+                transform: translateY(-1.5%) translateX(-0.5%);
+                opacity: 0.8;
+            }
+            50% {
+                transform: translateY(0.5%) translateX(0.8%);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-1%) translateX(1.2%);
+                opacity: 0.85;
+            }
+        }
+
+        #moonlight-layer {
+            position: fixed;
+            top: -10%;
+            left: 50%;
+            width: 45vw;
+            height: 45vw;
+            max-width: 700px;
+            max-height: 700px;
+            z-index: 0;
+            pointer-events: none;
+            background: radial-gradient(circle, rgba(190, 200, 230, 0.1) 0%, rgba(180, 190, 220, 0.04) 35%, transparent 65%);
+            border-radius: 50%;
+            transform: translateX(-50%);
+            animation: moon-breathe 8s ease-in-out infinite alternate;
+        }
+
+        @keyframes moon-breathe {
+            0% {
+                opacity: 0.7;
+                transform: translateX(-50%) scale(1);
+            }
+            100% {
+                opacity: 1;
+                transform: translateX(-50%) scale(1.06);
+            }
+        }
+
+        /* ═══════════════════════════════════════
+           PASSWORD GATE OVERLAY
+           ═══════════════════════════════════════ */
+        #password-gate {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            transition: opacity var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1),
+                visibility var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 1;
+            visibility: visible;
+        }
+
+        #password-gate.gate-hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .gate-panel {
+            position: relative;
+            z-index: 11;
+            text-align: center;
+            padding: clamp(2rem, 6vw, 4.5rem) clamp(1.5rem, 5vw, 4rem);
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            box-shadow: var(--glass-shadow), inset 0 0 80px rgba(120, 140, 200, 0.04);
+            backdrop-filter: blur(24px) saturate(140%);
+            -webkit-backdrop-filter: blur(24px) saturate(140%);
+            max-width: 480px;
+            width: calc(100% - 3rem);
+            animation: gate-fade-in 1.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+            transform-origin: center;
+            transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+                opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 0.6s ease;
+        }
+
+        @keyframes gate-fade-in {
+            0% {
+                opacity: 0;
+                transform: translateY(30px) scale(0.96);
+                filter: blur(4px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+                filter: blur(0);
+            }
+        }
+
+        .gate-panel.unlocking {
+            transform: scale(0.9) translateY(-20px);
+            opacity: 0;
+            filter: blur(6px);
+            box-shadow: 0 0 120px rgba(160, 180, 240, 0.25), var(--glass-shadow);
+            transition: all 0.9s cubic-bezier(0.55, 0, 0.25, 1);
+        }
+
+        .gate-panel.shaking {
+            animation: gate-shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+        }
+
+        @keyframes gate-shake {
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+            10% {
+                transform: translateX(-10px);
+            }
+            30% {
+                transform: translateX(9px);
+            }
+            50% {
+                transform: translateX(-7px);
+            }
+            70% {
+                transform: translateX(5px);
+            }
+            90% {
+                transform: translateX(-2px);
+            }
+        }
+
+        .gate-title {
+            font-family: var(--font-display);
+            font-size: clamp(1.6rem, 4.5vw, 2.4rem);
+            font-weight: 400;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            color: var(--text-primary);
+            margin-bottom: 0.75rem;
+            text-shadow: 0 0 40px rgba(180, 200, 240, 0.25), 0 2px 8px rgba(0, 0, 0, 0.5);
+            animation: title-glow 4s ease-in-out infinite alternate;
+        }
+
+        @keyframes title-glow {
+            0% {
+                text-shadow: 0 0 30px rgba(180, 200, 240, 0.2), 0 2px 8px rgba(0, 0, 0, 0.5);
+            }
+            100% {
+                text-shadow: 0 0 55px rgba(200, 210, 250, 0.35), 0 2px 12px rgba(0, 0, 0, 0.5);
+            }
+        }
+
+        .gate-subtitle {
+            font-size: clamp(0.75rem, 1.8vw, 0.9rem);
+            font-weight: 300;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+            margin-bottom: 2.5rem;
+            font-style: italic;
+            opacity: 0.8;
+        }
+
+        .gate-divider {
+            width: 50px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent-cold), transparent);
+            margin: 1.2rem auto 1.8rem;
+            opacity: 0.5;
+        }
+
+        .password-input-wrap {
+            position: relative;
+            margin-bottom: 1.5rem;
+            transition: box-shadow 0.4s ease;
+        }
+
+        .password-input-wrap.error-glow {
+            box-shadow: 0 0 30px var(--error-glow), 0 0 60px rgba(180, 60, 80, 0.15);
+            border-radius: 12px;
+        }
+
+        .gate-input {
+            width: 100%;
+            padding: 0.9rem 1.4rem;
+            font-size: 1rem;
+            font-weight: 300;
+            letter-spacing: 0.15em;
+            color: var(--text-primary);
+            background: rgba(8, 8, 22, 0.7);
+            border: 1px solid rgba(140, 160, 220, 0.2);
+            border-radius: 12px;
+            outline: none;
+            transition: border-color 0.4s ease, box-shadow 0.4s ease, background 0.4s ease;
+            font-family: var(--font-main);
+            text-align: center;
+            caret-color: var(--accent-cold);
+            user-select: text;
+            -webkit-user-select: text;
+        }
+        .gate-input::placeholder {
+            color: rgba(160, 155, 185, 0.45);
+            letter-spacing: 0.12em;
+            font-weight: 300;
+            font-size: 0.85rem;
+        }
+        .gate-input:focus {
+            border-color: rgba(170, 185, 230, 0.4);
+            box-shadow: 0 0 30px rgba(150, 170, 220, 0.12), inset 0 0 20px rgba(140, 160, 210, 0.05);
+            background: rgba(10, 10, 26, 0.8);
+        }
+        .gate-input.error {
+            border-color: var(--error-border);
+            box-shadow: 0 0 30px var(--error-glow), inset 0 0 20px rgba(180, 60, 80, 0.08);
+            animation: input-error-pulse 0.6s ease;
+        }
+        @keyframes input-error-pulse {
+            0%,
+            100% {
+                box-shadow: 0 0 30px var(--error-glow), inset 0 0 20px rgba(180, 60, 80, 0.08);
+            }
+            50% {
+                box-shadow: 0 0 50px var(--error-glow), inset 0 0 30px rgba(180, 60, 80, 0.15);
+            }
+        }
+
+        .gate-button {
+            width: 100%;
+            padding: 0.9rem 1.5rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--text-primary);
+            background: rgba(20, 20, 40, 0.6);
+            border: 1px solid rgba(150, 170, 220, 0.25);
+            border-radius: 12px;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.4s ease;
+            font-family: var(--font-main);
+            position: relative;
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .gate-button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: radial-gradient(circle, rgba(170, 190, 240, 0.2) 0%, transparent 70%);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.6s ease, height 0.6s ease;
+        }
+        .gate-button:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+        .gate-button:hover {
+            border-color: rgba(170, 185, 235, 0.45);
+            background: rgba(28, 28, 52, 0.7);
+            box-shadow: 0 0 35px rgba(150, 170, 220, 0.15), 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+        .gate-button:active {
+            transform: scale(0.98);
+            border-color: rgba(170, 185, 235, 0.55);
+            background: rgba(32, 32, 58, 0.75);
+        }
+
+        .gate-error {
+            font-size: 0.8rem;
+            font-weight: 300;
+            letter-spacing: 0.06em;
+            color: rgba(200, 130, 140, 0.9);
+            margin-top: 0.9rem;
+            min-height: 1.4em;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            font-style: italic;
+        }
+        .gate-error.visible {
+            opacity: 1;
+        }
+
+        /* Light ripple effect on unlock */
+        #unlock-ripple {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(200, 215, 250, 0.35) 0%, rgba(160, 180, 230, 0.15) 30%, rgba(100, 120, 180, 0.05) 55%, transparent 70%);
+            transform: translate(-50%, -50%);
+            z-index: 9;
+            pointer-events: none;
+            opacity: 0;
+            transition: none;
+        }
+        #unlock-ripple.ripple-active {
+            animation: ripple-expand 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+        }
+        @keyframes ripple-expand {
+            0% {
+                width: 0;
+                height: 0;
+                opacity: 1;
+            }
+            100% {
+                width: 200vw;
+                height: 200vw;
+                opacity: 0;
+            }
+        }
+
+        /* ═══════════════════════════════════════
+           MAIN PROFILE WEBSITE
+           ═══════════════════════════════════════ */
+        #main-site {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 1.5s cubic-bezier(0.4, 0, 0.2, 1),
+                visibility 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 1.5rem;
+        }
+
+        #main-site.site-revealed {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+
+        .profile-container {
+            text-align: center;
+            max-width: 620px;
+            width: 100%;
+            padding: clamp(2rem, 6vw, 4rem) clamp(1.2rem, 4vw, 3rem);
+            background: rgba(12, 12, 28, 0.5);
+            border: 1px solid rgba(140, 160, 220, 0.15);
+            border-radius: 24px;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), inset 0 0 60px rgba(120, 140, 200, 0.03);
+            backdrop-filter: blur(20px) saturate(130%);
+            -webkit-backdrop-filter: blur(20px) saturate(130%);
+            animation: profile-fade-in 1.5s cubic-bezier(0.22, 1, 0.36, 1) 0.2s forwards;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        #main-site.site-revealed .profile-container {
+            animation: profile-fade-in 1.2s cubic-bezier(0.22, 1, 0.36, 1) 0.3s forwards;
+        }
+
+        @keyframes profile-fade-in {
+            0% {
+                opacity: 0;
+                transform: translateY(24px) scale(0.97);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .profile-avatar {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 40% 35%, rgba(180, 195, 235, 0.25), rgba(80, 90, 140, 0.15));
+            border: 2px solid rgba(160, 175, 220, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            font-family: var(--font-display);
+            font-size: 2rem;
+            color: rgba(200, 210, 240, 0.8);
+            box-shadow: 0 0 40px rgba(150, 170, 220, 0.15), 0 8px 30px rgba(0, 0, 0, 0.4);
+            letter-spacing: 0.05em;
+            position: relative;
+            overflow: hidden;
+        }
+        .profile-avatar::after {
+            content: '';
+            position: absolute;
+            top: -30%;
+            left: -30%;
+            width: 60%;
+            height: 60%;
+            background: radial-gradient(ellipse, rgba(200, 215, 250, 0.2), transparent);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .profile-name {
+            font-family: var(--font-display);
+            font-size: clamp(1.8rem, 5vw, 2.5rem);
+            font-weight: 400;
+            letter-spacing: 0.1em;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            text-shadow: 0 0 50px rgba(180, 200, 240, 0.25), 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .profile-tagline {
+            font-size: clamp(0.8rem, 1.8vw, 0.95rem);
+            font-weight: 300;
+            letter-spacing: 0.06em;
+            color: var(--text-secondary);
+            margin-bottom: 1.8rem;
+            font-style: italic;
+        }
+
+        .profile-bio {
+            font-size: clamp(0.85rem, 1.6vw, 0.95rem);
+            font-weight: 300;
+            line-height: 1.7;
+            letter-spacing: 0.02em;
+            color: rgba(210, 200, 230, 0.75);
+            margin-bottom: 2rem;
+            max-width: 480px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .profile-divider {
+            width: 60px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(160, 175, 220, 0.5), transparent);
+            margin: 0 auto 1.8rem;
+        }
+
+        .profile-links {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.8rem;
+            margin-bottom: 1.8rem;
+        }
+
+        .profile-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1.2rem;
+            font-size: 0.75rem;
+            font-weight: 400;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            text-decoration: none;
+            color: rgba(200, 200, 225, 0.7);
+            background: rgba(15, 15, 32, 0.5);
+            border: 1px solid rgba(140, 160, 220, 0.18);
+            border-radius: 30px;
+            transition: all 0.35s ease;
+            font-family: var(--font-main);
+        }
+        .profile-link:hover {
+            border-color: rgba(170, 185, 235, 0.45);
+            background: rgba(25, 25, 48, 0.7);
+            color: rgba(230, 228, 245, 0.9);
+            box-shadow: 0 0 25px rgba(150, 170, 220, 0.12);
+        }
+
+        .profile-meta {
+            font-size: 0.7rem;
+            font-weight: 300;
+            letter-spacing: 0.15em;
+            color: rgba(160, 155, 185, 0.5);
+            text-transform: uppercase;
+        }
+
+        /* ═══════════════════════════════════════
+           RESPONSIVE ADJUSTMENTS
+           ═══════════════════════════════════════ */
+        @media (max-width: 480px) {
+            .gate-panel {
+                padding: 2rem 1.2rem;
+                border-radius: 16px;
+            }
+            .gate-title {
+                font-size: 1.4rem;
+                letter-spacing: 0.18em;
+            }
+            .gate-subtitle {
+                font-size: 0.7rem;
+                margin-bottom: 1.8rem;
+            }
+            .gate-input {
+                padding: 0.8rem 1rem;
+                font-size: 0.9rem;
+            }
+            .gate-button {
+                padding: 0.8rem 1rem;
+                font-size: 0.75rem;
+                letter-spacing: 0.22em;
+            }
+            .profile-avatar {
+                width: 70px;
+                height: 70px;
+                font-size: 1.5rem;
+            }
+            .profile-container {
+                padding: 1.5rem 1rem;
+                border-radius: 18px;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .gate-panel {
+                padding: 1.5rem 0.9rem;
+                width: calc(100% - 2rem);
+            }
+            .gate-title {
+                font-size: 1.2rem;
+                letter-spacing: 0.14em;
+            }
+        }
+
+        @media (min-width: 768px) {
+            .gate-panel {
+                padding: 4rem 3.5rem;
+                border-radius: 24px;
+            }
+            .gate-title {
+                font-size: 2.6rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ═══ BACKGROUND LAYERS (always active) ═══ -->
+    <div id="nebula-layer" aria-hidden="true"></div>
+    <div id="moonlight-layer" aria-hidden="true"></div>
+    <canvas id="starfield-canvas" aria-hidden="true"></canvas>
+    <canvas id="particle-canvas" aria-hidden="true"></canvas>
+    <div id="fog-layer" aria-hidden="true"></div>
+
+    <!-- ═══ UNLOCK RIPPLE EFFECT ═══ -->
+    <div id="unlock-ripple" aria-hidden="true"></div>
+
+    <!-- ═══ PASSWORD GATE OVERLAY ═══ -->
+    <div id="password-gate" role="dialog" aria-modal="true" aria-label="Password protected area">
+        <div class="gate-panel" id="gate-panel">
+            <h1 class="gate-title">HELLO!</h1>
+            <h2>Thử thách: Khóa tọa độ (A, B)</h2>
+
+    <div class="item">
+        <p><strong>1. Chỉ số A:</strong> Giải mã ma trận cột \(C = \begin{pmatrix} 13 \\ 9 \end{pmatrix}\) bằng ma trận khóa Hill \(K = \begin{pmatrix} 3 & 4 \\ 1 & 2 \end{pmatrix}\):</p>
+        $$\begin{pmatrix} a_1 \\ a_2 \end{pmatrix} = K^{-1} \cdot C \pmod{26}$$
+        <p>➔ <strong>Số A:</strong> \(A = a_1 + a_2\)</p>
+    </div>
+
+    <div class="item">
+        <p><strong>2. Chỉ số B:</strong> Cho \(y\) là giá trị nguyên dương nhỏ nhất thỏa mãn phương trình Pell:</p>
+        $$x^2 - 15y^2 = 1 \quad (x, y \in \mathbb{Z}^+)$$
+        <p>➔ <strong>Số B:</strong> \(B = y \times 2\)</p>
+    </div>
+
+    <hr style="border: 0; border-top: 1px solid #334155; margin: 20px 0;">
+
+    <p class="highlight">Yêu cầu: Tìm cặp số (A, B).</p>
+            <div class="gate-divider" aria-hidden="true"></div>
+            <div class="password-input-wrap" id="input-wrap">
+                <input
+                type="password"
+                id="password-input"
+                class="gate-input"
+                placeholder="Enter password"
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="off"
+                spellcheck="false"
+                aria-label="Password input"
+                enterkeyhint="go"
+                />
+            </div>
+            <button class="gate-button" id="unlock-btn" type="button">Unlock</button>
+            <p class="gate-error" id="gate-error" aria-live="polite">That isn't the key.</p>
+        </div>
+    </div>
+
+    <!-- ═══ MAIN PROFILE WEBSITE (hidden until unlock) ═══ -->
+    <div id="main-site" aria-hidden="true">
+        <div class="profile-container">
+            <div class="profile-avatar" aria-hidden="true">✦</div>
+            <h2 class="profile-name">Who's that</h2>
+            <p class="profile-tagline">— Do you want to know what I'm like —</p>
+            <div class="profile-divider" aria-hidden="true"></div>
+            <p class="profile-bio">
+                Dùng AI để đi tới đây?
+                Đầu tiên, tôi không lừa dối ai cả.
+                Thứ hai, tôi không thực sự công nhận ai khi tôi chưa tin tưởng.
+                Thứ ba, đừng đánh giá con người tôi chỉ qua vài lời nói.
+                Tôi là một người hài hước? Đó chỉ là vẻ bề ngoài.
+                Ai đó hỏi tôi có từng yêu ai thật lòng? Đã từng.
+                Tất cả những gì tôi biểu hiện ra chỉ là một phần nhỏ con người thật của tôi. 
+                Tôi có ước mơ và chỉ có duy nhất một động lực để cố gắng!. 
+
+            </p>
+            <div class="profile-links">
+                <a href="#" class="profile-link" aria-label="Email">✉&nbsp; Email</a>
+                <a href="#" class="profile-link" aria-label="GitHub">⌥&nbsp; GitHub</a>
+                <a href="#" class="profile-link" aria-label="Twitter">𝕏&nbsp; Twitter</a>
+                <a href="#" class="profile-link" aria-label="Instagram">◉&nbsp; Instagram</a>
+            </div>
+            <p class="profile-meta">— &#169; 2026 · Nguyen Minh Chau · All rights reserved —</p>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // ─── CONSTANTS ──────────────────────────────
+            const ACCESS_PASSWORD = "20,8";
+            const TRANSITION_DELAY = 1400; // ms — total unlock transition
+            const FADE_OUT_DURATION = 600; // ms — panel fade out
+            const ERROR_RESET_DELAY = 2200; // ms — error message auto-hide
+
+            // ─── DOM REFS ───────────────────────────────
+            const gateEl = document.getElementById('password-gate');
+            const gatePanel = document.getElementById('gate-panel');
+            const passwordInput = document.getElementById('password-input');
+            const unlockBtn = document.getElementById('unlock-btn');
+            const gateError = document.getElementById('gate-error');
+            const inputWrap = document.getElementById('input-wrap');
+            const rippleEl = document.getElementById('unlock-ripple');
+            const mainSiteEl = document.getElementById('main-site');
+            const starfieldCanvas = document.getElementById('starfield-canvas');
+            const particleCanvas = document.getElementById('particle-canvas');
+
+            // ─── STATE ─────────────────────────────────
+            let isUnlocked = false;
+            let errorTimeout = null;
+            let shakeTimeout = null;
+
+            // ─── STARFIELD ENGINE ──────────────────────
+            class Starfield {
+                constructor(canvas) {
+                    this.canvas = canvas;
+                    this.ctx = canvas.getContext('2d');
+                    this.stars = [];
+                    this.resize();
+                    this.initStars();
+                    this.bindResize();
+                    this.animate();
+                }
+
+                resize() {
+                    this.width = this.canvas.width = window.innerWidth;
+                    this.height = this.canvas.height = window.innerHeight;
+                }
+
+                bindResize() {
+                    window.addEventListener('resize', () => {
+                        this.resize();
+                        this.initStars();
+                    });
+                }
+
+                initStars() {
+                    const count = Math.floor((this.width * this.height) / 3500);
+                    this.stars = [];
+                    for (let i = 0; i < count; i++) {
+                        this.stars.push({
+                            x: Math.random() * this.width,
+                            y: Math.random() * this.height,
+                            radius: Math.random() * 1.3 + 0.3,
+                            baseAlpha: Math.random() * 0.6 + 0.2,
+                            twinkleSpeed: Math.random() * 0.015 + 0.005,
+                            twinkleOffset: Math.random() * Math.PI * 2,
+                            driftX: (Math.random() - 0.5) * 0.015,
+                            driftY: (Math.random() - 0.5) * 0.015,
+                        });
+                    }
+                }
+
+                animate() {
+                    const ctx = this.ctx;
+                    const w = this.width;
+                    const h = this.height;
+                    ctx.clearRect(0, 0, w, h);
+                    const time = Date.now() * 0.001;
+                    for (const s of this.stars) {
+                        const twinkle = Math.sin(time * s.twinkleSpeed * 60 + s.twinkleOffset) * 0.4 + 0.6;
+                        const alpha = s.baseAlpha * twinkle;
+                        s.x += s.driftX;
+                        s.y += s.driftY;
+                        if (s.x < -5) s.x = w + 5;
+                        if (s.x > w + 5) s.x = -5;
+                        if (s.y < -5) s.y = h + 5;
+                        if (s.y > h + 5) s.y = -5;
+                        ctx.beginPath();
+                        ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+                        ctx.fillStyle = `rgba(220, 225, 245, ${alpha.toFixed(3)})`;
+                        ctx.fill();
+                        if (s.radius > 1.0) {
+                            ctx.beginPath();
+                            ctx.arc(s.x, s.y, s.radius * 2.8, 0, Math.PI * 2);
+                            ctx.fillStyle = `rgba(190, 200, 235, ${(alpha * 0.15).toFixed(3)})`;
+                            ctx.fill();
+                        }
+                    }
+                    requestAnimationFrame(() => this.animate());
+                }
+            }
+
+            // ─── FLOATING PARTICLES ───────────────────
+            class ParticleField {
+                constructor(canvas) {
+                    this.canvas = canvas;
+                    this.ctx = canvas.getContext('2d');
+                    this.particles = [];
+                    this.resize();
+                    this.initParticles();
+                    this.bindResize();
+                    this.animate();
+                }
+
+                resize() {
+                    this.width = this.canvas.width = window.innerWidth;
+                    this.height = this.canvas.height = window.innerHeight;
+                }
+
+                bindResize() {
+                    window.addEventListener('resize', () => {
+                        this.resize();
+                        this.initParticles();
+                    });
+                }
+
+                initParticles() {
+                    const count = Math.floor((this.width * this.height) / 12000);
+                    this.particles = [];
+                    for (let i = 0; i < count; i++) {
+                        this.particles.push({
+                            x: Math.random() * this.width,
+                            y: Math.random() * this.height,
+                            size: Math.random() * 2 + 0.5,
+                            baseAlpha: Math.random() * 0.3 + 0.08,
+                            floatSpeed: Math.random() * 0.25 + 0.08,
+                            driftAngle: Math.random() * Math.PI * 2,
+                            driftSpeed: Math.random() * 0.12 + 0.03,
+                            phase: Math.random() * Math.PI * 2,
+                        });
+                    }
+                }
+
+                animate() {
+                    const ctx = this.ctx;
+                    const w = this.width;
+                    const h = this.height;
+                    ctx.clearRect(0, 0, w, h);
+                    const time = Date.now() * 0.001;
+                    for (const p of this.particles) {
+                        p.x += Math.cos(p.driftAngle) * p.driftSpeed;
+                        p.y += Math.sin(p.driftAngle) * p.driftSpeed - p.floatSpeed * 0.15;
+                        p.driftAngle += (Math.random() - 0.5) * 0.02;
+                        const glow = Math.sin(time * 0.8 + p.phase) * 0.5 + 0.5;
+                        const alpha = p.baseAlpha * (0.6 + glow * 0.5);
+                        if (p.y < -10) { p.y = h + 10;
+                            p.x = Math.random() * w; }
+                        if (p.y > h + 10) { p.y = -10;
+                            p.x = Math.random() * w; }
+                        if (p.x < -10) p.x = w + 10;
+                        if (p.x > w + 10) p.x = -10;
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                        ctx.fillStyle = `rgba(200, 210, 240, ${alpha.toFixed(3)})`;
+                        ctx.fill();
+                    }
+                    requestAnimationFrame(() => this.animate());
+                }
+            }
+
+            // ─── INITIALIZE BACKGROUNDS ──────────────
+            const starfield = new Starfield(starfieldCanvas);
+            const particleField = new ParticleField(particleCanvas);
+
+            // ─── UNLOCK FLOW ──────────────────────────
+            function attemptUnlock() {
+                if (isUnlocked) return;
+                const entered = passwordInput.value;
+
+                if (entered === ACCESS_PASSWORD) {
+                    performUnlock();
+                } else {
+                    triggerError();
+                }
+            }
+
+            function performUnlock() {
+                isUnlocked = true;
+                // Clear any pending error states
+                clearErrorState();
+
+                // 1. Activate ripple
+                rippleEl.classList.add('ripple-active');
+                setTimeout(() => {
+                    rippleEl.classList.remove('ripple-active');
+                }, 1200);
+
+                // 2. Panel fades/scales away
+                gatePanel.classList.add('unlocking');
+
+                // 3. Gate overlay fades out
+                setTimeout(() => {
+                    gateEl.classList.add('gate-hidden');
+                }, FADE_OUT_DURATION);
+
+                // 4. Main site reveals
+                setTimeout(() => {
+                    mainSiteEl.classList.add('site-revealed');
+                    mainSiteEl.setAttribute('aria-hidden', 'false');
+                    gateEl.setAttribute('aria-hidden', 'true');
+                }, FADE_OUT_DURATION + 200);
+
+                // 5. Cleanup after full transition
+                setTimeout(() => {
+                    gatePanel.classList.remove('unlocking');
+                    passwordInput.value = '';
+                }, TRANSITION_DELAY + 300);
+            }
+
+            function triggerError() {
+                // Show error message
+                gateError.classList.add('visible');
+                inputWrap.classList.add('error-glow');
+                passwordInput.classList.add('error');
+
+                // Shake the panel
+                gatePanel.classList.remove('shaking');
+                void gatePanel.offsetWidth; // force reflow
+                gatePanel.classList.add('shaking');
+                if (shakeTimeout) clearTimeout(shakeTimeout);
+                shakeTimeout = setTimeout(() => {
+                    gatePanel.classList.remove('shaking');
+                }, 550);
+
+                // Clear input
+                passwordInput.value = '';
+
+                // Auto-hide error after delay
+                if (errorTimeout) clearTimeout(errorTimeout);
+                errorTimeout = setTimeout(() => {
+                    clearErrorState();
+                }, ERROR_RESET_DELAY);
+
+                // Refocus
+                setTimeout(() => {
+                    if (!isUnlocked) passwordInput.focus();
+                }, 300);
+            }
+
+            function clearErrorState() {
+                gateError.classList.remove('visible');
+                inputWrap.classList.remove('error-glow');
+                passwordInput.classList.remove('error');
+                if (errorTimeout) {
+                    clearTimeout(errorTimeout);
+                    errorTimeout = null;
+                }
+            }
+
+            // ─── EVENT LISTENERS ─────────────────────
+            unlockBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                attemptUnlock();
+            });
+
+            passwordInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    attemptUnlock();
+                }
+                // Clear error on typing
+                if (gateError.classList.contains('visible')) {
+                    clearErrorState();
+                }
+            });
+
+            passwordInput.addEventListener('input', () => {
+                if (gateError.classList.contains('visible')) {
+                    clearErrorState();
+                }
+            });
+
+            // Prevent form submission
+            document.addEventListener('submit', (e) => e.preventDefault());
+
+            // Focus password input on load
+            window.addEventListener('load', () => {
+                setTimeout(() => {
+                    passwordInput.focus();
+                }, 600);
+            });
+
+            // ─── KEYBOARD & ACCESSIBILITY ────────────
+            document.addEventListener('keydown', (e) => {
+                if (isUnlocked) return;
+                if (e.key === 'Escape') {
+                    passwordInput.blur();
+                }
+                // Prevent tab from moving focus outside the gate
+                if (e.key === 'Tab' && document.activeElement !== passwordInput &&
+                    document.activeElement !== unlockBtn) {
+                    e.preventDefault();
+                    passwordInput.focus();
+                }
+            });
+
+            // ─── PREVENT INTERACTION WITH MAIN SITE ───
+            // While gate is active, main site has pointer-events: none
+            // Also ensure it stays inert
+            mainSiteEl.setAttribute('inert', '');
+            const observer = new MutationObserver(() => {
+                if (isUnlocked) {
+                    mainSiteEl.removeAttribute('inert');
+                } else {
+                    mainSiteEl.setAttribute('inert', '');
+                }
+            });
+            observer.observe(mainSiteEl, { attributes: true, childList: true, subtree: true });
+
+            // ─── LOG (dev only, not shown to user) ──
+            console.log(
+                '%c🔐 Night Gate Active — Enter the password to continue.',
+                'color: #a8a0c0; font-size: 12px; letter-spacing: 1px;'
+            );
+
+            // ─── EXPOSE FOR DEBUGGING (not exposed visually) ──
+            // The password is only in the JS scope, not displayed anywhere.
+            // Intentionally not exposed as a global variable.
+        })();
+    </script>
+</body>
+</html>
